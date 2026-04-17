@@ -1,0 +1,36 @@
+\section{Related work}
+
+
+In 2009, Krishnamurthy and Wills provided one of the first longitudinal analyses of user information flows to third-party sites (called \textit{aggregators})~\cite{krishnamurthy2009privacy}.
+The authors also observed a trend of serving third-party tracking content from first-party contexts, pointing out the challenges for countermeasures based on blocklists.
+Meyer and Mitchell studied the technology and policy aspects of third-party tracking~\cite{mayer2012third}. Englehardt and Narayanan \cite{englehardt2016online} 
+measured tracking on Alexa top million websites using OpenWPM and discovered new fingerprinting techniques such as AudioContext API-based fingerprinting.
+
+The CNAME tracking scheme was mentioned anecdotally by Bau in 2013 \cite{bau2013promising}, but the authors did not focus on the technique specifically.
+To our knowledge, the first systematic analysis of the CNAME scheme used to embed third-party trackers in first-party content is the work of Olejnik and Casteluccia \cite{olejnik2014analysis}, 
+in which they identified this special arrangement as part of the real-time bidding setup.
+The authors also reported leaks of first-party cookies to such third parties. In our paper, we extensively expand such analyses.
+Although cookies were most commonly used for cross-site tracking, more advanced mechanisms have been deployed by websites and studied by the researchers. Browser fingerprinting \cite{eckersley2010unique}, where traits of the host \cite{yen2012host}, system, browser and graphics stack~\cite{mowery2012pixel} are extracted to identify the user is one of the stateless tracking vectors that does not need cookies to operate.
+Fingerprinting on the web was measured at scale by Acar et al. \cite{acar2013fpdetective, Acar:2014:WNF:2660267.2660347}, Nikiforakis et al.\cite{nikiforakis2013cookieless},
+and Englehardt and Narayanan~\cite{englehardt2016online}. Combining multiple tracking vectors at the same time may give rise to supercookies or evercookies, as demonstrated first by Samy Kamkar \cite{kamkar2010evercookie}.
+Over the years, many information exfiltration or tracking vectors have been studied, including Cache Etag HTTP header~\cite{ayenson2011flash}, WebSockets \cite{bashir2018tracking}, ultrasound beacons \cite{mavroudis2017privacy}, and fingerprinting sensors calibrations on mobile devices with sensors \cite{zhang2019sensorid}. 
+ 
+
+Similar to these studies we measure the prevalence of a tracking mechanism that tries to circumvent existing countermeasures. However our work uses novel methods to identify CNAME-based trackers in historical crawl data, allowing us to perform a longitudinal measurement.
+
+
+In concurrent work, Dao et al.\ also explored the ecosystem of CNAME-based trackers~\cite{dao2020cnamecloaking}.
+Based on a crawl of the Alexa top 300k, they find 1,762 CNAME-based tracking domains as of January 2020, which are detected by matching the CNAME domain with EasyPrivacy.
+In our work, we detected 9,273 sites that leverage CNAME-based tracking in a same-site context and an additional 19,226 websites that use it in a cross-site context.
+We rely on an approach that combines historical DNS records (A records) with manually constructed fingerprints.
+The latter is used to filter out any potential false positives that may be caused by changes in the IP space ownership, or because the CNAME- or A-records may be used to other services of the same provider unrelated to tracking.
+Based on the evaluation of our method in Section~\ref{sec:method_validation}, we find that it is important to use request-specific information to prevent incorrectly marking domains as using CNAME-based tracking.
+Furthermore, relying on filter lists, and in particular on the eTLD+1 domains that are listed, could result in the inclusion of non-tracking domains, e.g.\ sp-prod.net is the second most popular tracker considered by Dao et al., but was excluded in our work as it is part of a ``Consent Management Platform'' that captures cookie consent for compliance with GDPR \cite{CMP}.
+Additionally, filter lists may be incomplete, resulting in trackers being missed: for example, Pardot, the tracker we find to be most widely used, was not detected in prior work.
+Consequently, relying on filter lists also prevents the detection of new trackers, this limitation is not applicable to our method.
+
+Dao et al.\ also perform an analysis of the historical evolution of CNAME-based tracking, based on four datasets of the Alexa top 100k websites collected between January 2016 and January 2020.
+As the used OpenWPM datasets do not include DNS records, the researchers rely on a historical forward DNS dataset provided by Rapid7~\cite{rapid7fdns}, which does not cover all domains over time.
+By using the HTTP Archive dataset, which includes the IP address that was used, we were able to perform a more granular analysis, showing a more accurate growth pattern.
+We also show that this growth is rapidly increasing, significantly outperforming third-party trackers with a comparable customer base.
+Finally, to the best of our knowledge, we are the first to perform an analysis of the privacy and security implications associated with the CNAME-based tracking scheme.

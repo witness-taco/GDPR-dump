@@ -1,0 +1,75 @@
+\section{Background}
+
+
+\subsection{Web browser requests}
+Upon visiting a web page, the browser will make various requests to fetch embedded resources such as scripts, style sheets and images.
+Depending on the relation between the embedding website and the site that the resources are hosted on, these can be \textit{same-origin}, \textit{same-site} or \textit{cross-site}.
+If the resource shares the same scheme (i.e.\ http or https), host (e.g.\ www.example.com) and port (e.g.\ 80 or 443) as the embedding site, it is considered same-origin.
+In case there is no exact match for the host, but the resource is located on the same registrable domain name, the effective top level domain plus one (\textit{eTLD+1}), as the embedding website (e.g.\ www.example.com and foo.example.com), it is considered same-site.
+Finally, resources that have a different eTLD+1 domain with regard to the including website are considered cross-site, i.e., resources from \textit{tracker.com} included on \textit{example.com} are cross-site.
+
+Prior to making the connection to the server, the domain name first needs to be resolved to an IP address.
+In the most straightforward case, the DNS resolution of the domain name returns an \texttt{A} record containing the IP address.
+However, the domain could also use a \texttt{CNAME} record to refer to any other domain name.
+This can be an iterative process as the new domain name can again resolve to another \texttt{CNAME} record; this process continues until an \texttt{A} record is found.
+Through this indirection of CNAMEs, the host that the browser connects to may belong to a different party, such as a tracker, than the domain it actually requests the resource from.
+This means that requests to \textit{xxx.example.com} may actually be routed to a different site, such as \textit{yyy.tracker.com}.
+
+\textbf{Cookie scoping}
+Before a request is sent, the browser will first determine which cookies to attach in the HTTP request. 
+This includes all cookies that were set on the same (sub)domain as the one where the request will be sent to.
+Other cookies that will be included are those that were set by a same-site resource, i.e.\ either on another subdomain, or on the top domain, and had the \texttt{Domain} attribute set to the top domain, for instance by the following response header on https://sub.example.com/
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,]
+Set-Cookie: cookie=value; Domain=example.com
+\end{lstlisting}
+Cookies that were set without the \texttt{Domain} attribute will only be included on requests that are same-origin to the response containing the \texttt{Set-Cookie} header.
+The \texttt{SameSite} attribute on cookies determines whether a cookie will be included if the request is cross-site.
+If the value of this attribute is set to \texttt{None}, no restrictions will be imposed; if it is set to \texttt{Lax} or \texttt{Strict}, it will not be included on requests to resources that are cross-site to the embedding website; the latter imposes further restrictions on top-level navigational requests.
+Several browser vendors intend to move to a configuration that assigns \texttt{SameSite=Lax} to all cookies by default~\cite{chromiumsamesite,draft-west-cookie-incrementalism-01,firefoxsamesitelaxdefault}.
+As such, for third-party tracking to continue to work, the cookies set by the trackers explicitly need to set the \texttt{SameSite=None} attribute, which may make them easier to distinguish.
+For CNAME-based tracking, where the tracking requests are same-site, the move to SameSite cookie by default has no effect.
+
+\subsection{Tracking}
+\subsubsection{Third-party tracking}
+In a typical tracking scenario, websites include resources from a third-party tracker in a cross-site context.
+As a result, when a user visits one of these web pages, a cookie originating from the third party is stored in the visitor's browser.
+The next time a user visits a website on which the same tracker is embedded, the browser will include the cookie in the request to the tracker.
+This scheme allows trackers to identify users across different websites to build detailed profiles of their browsing behavior.
+Such tracking has triggered privacy concerns and has resulted in substantial research effort to understand the complexity of the tracking ecosystem \cite{mayer2012third,englehardt2015cookies} and its evolution \cite{lerner2016internet}.
+
+
+\subsubsection{First-party tracking}
+In first-party tracking the script and associated analytics requests are loaded from a same-site origin.
+Consequently, any cookie that is set will only be included with requests to the same site.
+Historically, one method that was used to bypass this limitation was cookie matching~\cite{olejnik2014selling}, where requests containing the current cookie are sent to a common third-party domain.
+However, such scripts can be blocked by anti-tracking tools based on simple matching rules.
+Instead, the technique covered in this work uses a delegation of the domain name, which circumvents the majority of anti-tracking mechanisms currently offered to users.
+
+\subsubsection{CNAME-based tracking}
+
+\textbf{General overview}
+In the typical case of third-party tracking, a website will include a JavaScript file from the tracker, which will then report the analytics information by sending (cross-site) requests to the tracker domain.
+With CNAME-based tracking, the same operations are performed, except that the domain that the scripts are included from and where the analytics data is sent to, is a subdomain of the website.
+For example, the website \texttt{example.com} would include a tracking script from \texttt{track.example.com}, thus effectively appearing as same-site to the including website.
+Typically, the subdomain has a CNAME record that points to a server of the tracker.
+An overview of the CNAME-based tracking scheme is shown in Figure~\ref{fig:cname-scheme-overview}.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{figures/cname-scheme-overview.pdf} 
+	\caption{Overview of CNAME-based tracking.}
+	\label{fig:cname-scheme-overview}
+\end{figure}
+
+\noindent \textbf{Bypassing anti-tracking measures}
+The CNAME tracking scheme has direct implications for many anti-tracking mechanisms.
+Because the requests to the tracking services are same-site (i.e.\ they point to the same eTLD+1 domain as the visited website), countermeasures that aim to block third-party cookies, such as Safari's ITP, are effectively circumvented.
+Other popular anti-tracking mechanisms that rely on blocking requests or cookies by using block lists (such as EasyPrivacy \cite{easyprivacy} or Disconnect.me \cite{disconnectme}) become much harder to maintain  when trackers are served from a custom subdomain that is unique to every website. 
+To block CNAME-based tracking, block lists would need to contain an entry for every website that uses the CNAME-based tracking service, instead of a single entry per tracker or match all DNS-level domains, leading to greater performance costs.
+
+As a consequence of how the CNAME-based tracking scheme is constructed, it faces certain limitations in comparison to third-party tracking.
+For instance, there no longer exists a common identifier shared across the different websites (in typical third-party tracking, the third-party cookie is responsible for this functionality).
+Consequently, visits to different websites cannot be attributed to the same user using standard web development features.
+
+
+

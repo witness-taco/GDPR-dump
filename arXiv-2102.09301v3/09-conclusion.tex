@@ -1,0 +1,11 @@
+\section{Conclusion}
+
+Our research sheds light on the emerging ecosystem of CNAME-based tracking, a tracking scheme that takes advantage of a DNS-based cloaking technique to evade tracking countermeasures.
+Using HTTP Archive data and a novel method, we performed a longitudinal analysis of the CNAME-based tracking ecosystem using crawl data of 5.6M web pages.
+Our findings show that unlike other trackers with similar scale, CNAME-based trackers are becoming increasingly popular, and are mostly used to supplement ``typical'' third-party tracking services.
+We evaluated the privacy and security threats that are caused by including CNAME trackers in a same-site context.
+Through manual analysis we found that sensitive information such as email addresses and authentication cookies leak to CNAME trackers on sites where users can create accounts.
+Furthermore, we performed an automated analysis of cookie leaks to CNAME trackers and found that cookies set by other parties leak to CNAME trackers on 95\% of the websites that we studied.
+Finally we identified two major web security vulnerabilities that CNAME trackers caused.
+We disclosed the vulnerabilities to the respective parties and have worked with them to mitigate the issues.
+We hope that our research helps with addressing the security and privacy issues that we highlighted, and inform development of countermeasures and policy making with regard to online privacy and tracking. 

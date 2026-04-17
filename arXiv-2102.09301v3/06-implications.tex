@@ -1,0 +1,179 @@
+\section{Implications of first-party inclusion}
+\label{sec:implications-of-cname-tracking}
+In this section we investigate how CNAME-based tracking can expand a website’s attack surface.
+Since CNAME-based trackers are included in a same-site context, there may be additional security risks compared to third-party trackers. For instance, privacy-sensitive information, e.g.\ contained in cookies, may be inadvertently sent to the tracker, posing increased threats for users.
+
+\subsection{Transport security}
+When visiting a website that employs CNAME-based tracking, various types of requests are made to the tracker-controlled subdomain.
+We find that most commonly, the web page makes a request to report analytics data, typically via an asynchronous request or by creating an (invisible) <img> element.
+Additionally, we find that in most cases the tracking script is also included from the CNAME subdomain. 
+To ensure that a man-in-the-middle attacker cannot read or modify the requests and responses, a secure HTTPS connection is required.
+Based on the HTTP Archive dataset from July 2020, we find that the vast majority (92.18\%) of websites that use CNAME-based tracking support TLS, and in almost all cases the tracker requests are sent over secure connections.
+Nevertheless, we did identify 19 websites where active content, i.e.\ HTML or JavaScript, was requested from the tracker over an insecure connection.
+Although most modern browsers block these requests due mixed content policies, users with outdated browsers would still be susceptible to man-in-the-middle attacks.
+
+On 72 websites we found that an analytics request sent to a CNAME-based tracker was sent over HTTP while the web page was loaded over HTTPS.
+In this case, the request is not blocked but instead the browser warns the user that the connection is insecure.
+Because this is a same-site request (as opposed to a cross-site request as would be the case with third-party tracking), cookies that are scoped to the eTLD+1 domain, and that do not contain the \texttt{Secure} attribute, are attached to this request.
+Consequently these potentially identifying cookies can be intercepted on by network eavesdroppers.
+Furthermore an attacker could exploit unencrypted HTTP responses.
+Specifically, the adversary could inject arbitrary cookies in \texttt{Set-Cookie} headers to
+%responses
+%to set a cookie with an arbitrary value on the including website, effectively 
+launch a session-fixation attack~\cite{kolvsek2002session,schrank2010session}.
+In the remainder of this section, we explore the privacy and security threats associated with including the tracker as first party in more detail.
+
+
+\subsection{Tracker vulnerabilities: case studies}
+To further explore how the security of websites and their visitors is affected by including a CNAME-based tracker, we performed a limited security evaluation of the trackers that are included on publisher websites.
+For up to maximum 30 minutes per tracker, we analyzed the requests and responses to/from the CNAME subdomain for client-side web vulnerabilities.
+In most cases, we found that only a single request was made, and an empty response was returned.
+Despite the time-limited nature of our analysis, we did identify vulnerabilities in two different trackers that affect all publishers that include them.
+We reported the vulnerabilities to the affected trackers and actively worked with them to mitigate the issues.
+Unfortunately, in one instance the tracker did not respond to repeated attempts to report the vulnerability, leaving hundreds of websites exposed.
+We still hope to be able to contact this vendor through one of their customers.
+
+\subsubsection{Vulnerability 1: session fixation} The first vulnerability is caused by the tracker's functionality to extend the lifetime of first-party advertising and analytics cookies, such as Facebook's \texttt{\_fbp} cookie or the \texttt{\_ga} cookie by Google Analytics. 
+Because these cookies are set by a cross-site script through the \texttt{document.cookie} API, Safari's ITP 
+%and Firefox' ETP 
+limits their lifespan to seven days~\cite{safari-itp-21}.
+To overcome these limits, the tracker provides a specific endpoint on the CNAME subdomain that accepts a POST request with a JSON payload containing the cookie names and values whose lifetime should be extended.
+In the response, the tracker's server includes several \texttt{Set-Cookie} headers containing the tracking cookies.
+Consequently, these cookies are no longer set via the DOM API and would have an extended lifetime under Safari's ITP policies for cookies. We note that this circumvention is disabled as of late 2020, thanks to Safari's recent ITP update targeting CNAME-based trackers. This update caps the lifetime of HTTP cookies from CNAME trackers to seven days, which matches the lifetime of cookies set via JavaScript~\cite{safari-cname-defense}.
+
+We found that the tracker endpoint did not adequately validate the origin of the requests, nor the cookie names and values.
+Consequently, through the functionality provided by the tracker, which is enabled by default on all the websites that include the tracker in a first-party context, it becomes possible to launch a session-fixation attack.
+For example, on a shopping site the attacker could create their own profile and capture the cookies associated with their session.
+Subsequently, the attacker could abuse the session-fixation vulnerability to force the victim to set the same session cookie as the one from the attacker, resulting in the victim being logged in as the attacker.
+If at some point the victim would try to make a purchase and enter their credit card information, this would be done in the attacker's profile.
+Finally, the attacker can make purchases using the victim's credit card, or possibly even extract the credit card information.
+
+
+
+The impact of this vulnerability highlights the increased threat surface caused by using the CNAME-based tracking scheme.
+If a third-party tracker that was included in a cross-site context would have the same vulnerability, the consequences would be negligible.
+The extent of the vulnerability would be limited to the setting of an arbitrary cookie on a tracking domain (as opposed to the first-party visited website) which would have no effect on the user.
+However, because in the CNAME-tracking scheme the tracking domain is a subdomain of the website, cookies set with a \texttt{Domain} attribute of the eTLD+1 domain (this was the default in the detected vulnerability), will be attached to all requests of this website and all its subdomains.
+As a result, the vulnerability does not only affect the tracker, but introduces a vulnerability to all the websites that include it.
+
+
+\subsubsection{Vulnerability 2: cross-site scripting} The second vulnerability that we identified affects publishers that include a different tracker, and likewise it is directly related to tracker-specific functionality.
+In this case, the tracker offers a method to associate a user's email address with their fingerprint (based on IP address and browser properties such as the User-Agent string).
+This email address is later reflected in a dynamically generated script that is executed on every page load, allowing the website to retrieve it again, even if the user would clear their cookies.
+However, because the value of the email address is not properly sanitized, it is possible to include an arbitrary JavaScript payload that will be executed on every page that includes the tracking script.
+Interestingly, because the email address is associated with the user's browser and IP fingerprint, we found that the payload will also be executed in a private browsing mode or on different browser profiles.
+We tested this vulnerability on several publisher websites, and found that all could be exploited in the same way.
+As such, the issue introduced by the tracking provider caused a persistent XSS vulnerability in several hundreds of websites.
+
+\subsection{Sensitive information leaked to CNAME-based trackers}
+\label{sec:privacy-implications}
+CNAME-based trackers operate on a subdomain of publisher websites.
+It is therefore possible that cookies sent to the tracker may contain sensitive information, such as personal information (name, email, location) and authentication cookies, assuming these sensitive cookies are scoped to the eTLD+1 domain of the visited website (i.e. \texttt{Domain=.example.org}).
+Furthermore, it is possible that websites explicitly share personal information with the CNAME-based trackers in order to build a better profile on their users.
+
+To analyze the type of information that is sent to trackers and to assess the frequency of occurrence, we performed a manual experiment on a random subset of publishers.
+Based on data from a preliminary crawl of 20 pages per website, we selected up to ten publisher websites per tracker that had at least one HTML form element with a password field.
+We limited the number of websites in function of the manual effort required to manually register, login, interact with it, and thoroughly analyze the requests that were sent.
+We looked for authentication cookies (determined by verifying that these were essential to remain logged on to the website), and personal information such as the name and email that was provided during the registration process.
+
+Out of the 103 considered websites, we were able to successfully register and log in on 50 of them.
+In total, we found that on 13 of these websites sensitive information leaked to the CNAME tracker.
+The leaked information included the user's full name (on 1 website), location (on 2 websites), email address (on 4 websites, either in plain-text or hashed), and the authentication cookie (on 10 websites). 
+We note that such leaks are the result of including the trackers in a first-party context.
+Our limited study indicates that the CNAME tracking scheme negatively impacts users' security (authentication cookie leaks) and privacy (personal data leaks).
+
+
+\subsection{Cookie leaks to CNAME-based trackers}
+\label{sec:cookie-leak-automated-experiment}
+
+Next we perform an automated analysis to investigate cookies that are inadvertently sent to CNAME trackers.
+We conducted an automated crawl on June 7, 2020 of 8,807 websites that we, at that time, identified as using CNAME-based tracking following the methodology outlined in Section~\ref{sec:tracking-customers}.
+In this crawl, we searched for cookies sent to the CNAME subdomain while excluding the cookies set by the CNAME tracker itself (either through its subdomain or its third-party domains).
+
+\textbf{The crawler}
+We built our crawler by modifying the DDG Tracker Radar Collector \cite{ddg}, a Puppeteer-based crawler that uses the Chrome DevTools Protocol (CDP).
+We extended the crawler by adding capabilities to capture HTTP request cookies, POST data, and document.cookie assignments.
+DDG Tracker Radar Collector uses the Chrome DevTools Protocol to set breakpoints and capture the access to the Web API methods and properties that may be relevant to browser fingerprinting and tracking (e.g.\ document.cookie).
+We used this JavaScript instrumentation to identify scripts that set cookies using JavaScript.
+
+For each website, we loaded the homepage using a fresh profile.
+We instructed the crawler to wait ten second on each website, and then reload the page.
+This allowed us to capture the leaks of cookies that were set after the request to the CNAME-based tracker domain.
+We also collected HTTP headers, POST bodies, JavaScript calls, and cookies from the resulting profile.
+When crawling, we used a Safari User-Agent string, as we found at least one CNAME-based tracker (Criteo) employing first-party tracking for Safari users only.
+
+\textbf{Data analysis}
+To identify the cookie leaks, we first built the list of cookies sent to the CNAME subdomain.
+From the resulting list, we excluded session cookies, short cookies (less than 10 characters), and cookies that contain values that occur on multiple visits (to exclude non-uniquely identifying cookies).
+To determine the latter, we first built a mapping between the distinct cookie values and the number of sites they occur on.
+
+Next, we identified the \emph{setter} of the cookies.
+First, we searched the cookie name and value in \texttt{Set-Cookie} headers in HTTP responses.
+When the cookie in question was sent in the corresponding request, we excluded its response from the analysis.
+For JavaScript cookies, we searched for the name-value pair in assignments to \texttt{document.cookie} using the JavaScript instrumentation data.
+We then used the JavaScript stack trace to determine the origin of the script.
+After determining the setter, we excluded cookies set by the CNAME-based tracker itself.
+
+\textbf{Leaks in HTTP Cookie headers}
+
+We identified one or more cookie leaks on 7,377 sites (95\%) out of the 7,797 sites where we could identify the presence of at least one CNAME-based tracker.
+Table~\ref{tab:cookie-leak} shows the five origins with most cookies leaked to CNAME-based trackers.
+The overwhelming majority of cookie leaks (31K/35K) are due to third-party analytics scripts setting cookies on the first-party domain.
+
+
+The leakage of first-party cookies containing unique IDs may not reveal any additional information to CNAME-based trackers, since these trackers may already have an ID for the users in their own cookies.
+However, cookies containing other information such as ad campaign information, emails, authentication cookies may also leak to the CNAME-based trackers (as shown in Section~\ref{sec:privacy-implications}).
+Moreover, our analysis found that on 4,006 sites, a cookie set by a third-party domain is sent to the CNAME-based tracker's subdomain.
+3,898 of these sites are due to Pardot, which sets the same cookie on its first-party subdomain and its third-party domain.
+To set the same cookie on both domains, Pardot sends its unique ID in a URL parameter called~\texttt{visitor\_id} to its first-party subdomain. 
+
+\begin{table}[]
+\centering
+\caption{Five origins with most leaked cookies to CNAME-based trackers. The right column indicates the number of distinct sites cookies we observed one or more cookie leaks set by the scripts from these origins.}
+\begin{adjustbox}{max width=\textwidth}
+
+\begin{tabular}{llr}
+\toprule
+\textbf{Cookie origin} & \textbf{Purpose} & \textbf{\shortstack{Num.\ of \\ distinct sites}} \\ \midrule
+www.google-analytics.com & Analytics      & 5,970 \\
+connect.facebook.net     & FB Pixel       & 3,287 \\
+www.googletagmanager.com & Tag management & 2,376 \\
+bat.bing.com             & Advertising    & 1,182 \\
+assets.adobedtm.com      & Tag management & 887  \\ \bottomrule
+\end{tabular}
+\end{adjustbox}
+\label{tab:cookie-leak}
+\end{table}
+
+\textbf{Leaks in POST request bodies}
+While we accept and do not rule out that cookie leaks may often happen inadvertently, i.e.\ without the knowledge or the cooperation of the CNAME trackers, when browsers send cookies with a matching domain to the tracker, this picture is not always so straight-forward.
+Namely, we identified and investigated two other types of cookie leaks that involve more active participation by the CNAME trackers.
+First, we studied cookie values sent in the POST request bodies, again excluding the cookies set by the CNAME tracker itself, and session cookies and cookies that occur on multiple sites, as described above.
+We found that 166 cookies (on 94 distinct sites) set by another party were sent to a CNAME tracker's subdomain in a POST request body.
+The majority of these cases were due to TraceDock (46 sites) and Adobe Experience Cloud (30 sites), while 
+Otto Group and Webtrekk caused these cookie leaks on 11 and seven sites respectively.
+
+We used the request ``initiators'' field to identify the \emph{senders} of the requests.
+The ``initiators'' field contains the set of script addresses that triggered an HTTP request, derived from JavaScript stack traces.
+In 78 of the 166 instances, the CNAME subdomain or the tracker's third-party domains were among the initiators of the POST request. 
+In the remaining cases, the CNAME tracker's script was served on a different domain (e.g. Adobe Experience Cloud, assets.adobedtm.com), a different subdomain that also belongs to the CNAME tracker (e.g.\ Otto Group uses tp.xyz.com subdomain for its scripts and te.xyz.com for the endpoint), or the request was triggered by a tag manager script,
+or a combined script that contains the CNAME tracker's script.
+
+The cookies sent in the POST bodies indicate that certain CNAME tracker scripts actively read and exfiltrate cookies they may access on first party sites.
+Although the content of the cookies may not always reveal additional information, our manual analysis presented above revealed sensitive information such as email addresses, authentication cookies and other personal information is leaking to the CNAME trackers.
+
+\textbf{Leaks in request URLs}
+Next we investigate the cookies sent to CNAME tracker subdomains in the request URLs.
+To detect such leaks we searched for cookies in the request URLs (and URL-decoded URLs) excluding the scheme and the hostname.
+We excluded the same set of cookies as the previous two analyses -- cookies set by CNAME tracker itself, short cookies,  session cookies and cookies with non-unique values.
+
+We found 1,899 cookie leaks in request URLs to CNAME subdomains on 1,295 distinct sites. 
+1,566 of the cookies were sent to Adobe Experience Cloud's subdomain, while Pardot's and Eularian's subdomains received 130 and 101 cookies, respectively.
+In addition, in 4,121 cases (4,084 sites), a cookie set by Pardot's third-party domain was sent to its CNAME subdomain, confirming the finding above that Pardot syncs cookies between its third-party domain and its CNAME subdomain.
+Overall, in 378 cases the leaked cookie was set by a third-party domain, indicating that cookies were synced or simply exchanged between the domains.
+
+Our automated analysis of cookie leaks, in combination with the deeper manual analysis presented above indicates that passive and active collection of cookies by the CNAME trackers is highly prevalent and have severe privacy and security implications including the collection of email addresses, unique identifiers and authentication cookies.
+Further, our results show that certain CNAME-based trackers use third-party cookies for cross-site tracking and at times receive cookies set by other third-party domains, allowing them to track users across websites.
+
+
+

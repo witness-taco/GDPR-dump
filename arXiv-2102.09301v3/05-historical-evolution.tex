@@ -1,0 +1,123 @@
+\section{Historical Evolution}
+\label{sec:historical-evolution}
+
+In this section we report on various analyses we performed to capture the longitudinal evolution of CNAME-based tracking.
+
+\subsection{Uptake in CNAME-based tracking}
+First, we explore the change in prevalence of CNAME-based tracking over time.
+To achieve this, we leverage the dataset of HTTP Archive, which is collected on a monthly basis and dates back several years.
+We consider the datasets from December 2018, when the pages from the Chrome User Experience Report started to be used as input for their crawler, until October 2020.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{figures/methodology-overview-oct.pdf} 
+	\caption{Overview of the methodology that was used to determine CNAME-based trackers over time.}
+	\label{fig:methodology-overview}
+\end{figure}
+
+To determine the number of publishers using CNAME tracking over time, we used an iterative approach as shown in Figure~\ref{fig:methodology-overview}.
+Starting from the most recent month (October 2020), we obtained the domain names and associated IP addresses that were used to connect to the CNAME-trackers.
+Next, we use data from HTTP Archive's dataset from the previous month to determine all IP addresses that (confirmed) CNAME domains resolve to, allowing us to capture changes of IP addresses by trackers.
+By adding these IP addresses to the list of IPs we found in October through a scan with zdns, we obtain a set of IP addresses that were ever used by the different CNAME trackers.
+Furthermore, whenever we noticed that a tracker is using IPs within a certain range for the tracking subdomains, we added the whole range to the set of used IPs (e.g. Eulerian allocates IP addresses in the range 109.232.192.0/21 for the tracking subdomains). 
+Relying just on the IP information would likely lead to false positives as the trackers provide various other services which may be hosted on the same IP address, and ownership of IP addresses may change over time.
+To prevent marking unrelated services as tracking, we rely on our manually-defined \emph{request signatures} (as defined in Section~\ref{sec:detection-methodology}) to filter out any requests that are unrelated to tracking.
+Using the domain names of the confirmed tracking requests and the set of IP addresses associated with tracking providers, we can apply the same approach again for the previous month.
+We repeat this process for every month between October 2020 and December 2018.
+
+Figure~\ref{fig:number-of-customers-over-time} shows the total number of publisher eTLD+1s using CNAME-based tracking, either in a same-site or cross-site context.
+The sudden drop in number of cross-site inclusions of CNAME trackers in October 2019 is mainly due to a single tracker (Adobe Experience Cloud).
+We suspect it is related to changes it made with regard to CCPA regulations (the HTTP Archive crawlers are based in California)~\cite{omnitureccpa}.
+In general, we find that the number of publisher sites that employ CNAME-based tracking is gradually increasing over time.
+
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.9\linewidth]{figures/Total_historical.pdf} 
+	\caption{Number of eTLD+1 domains that include CNAME-based tracking in a same-site and cross-site context.}
+	\label{fig:number-of-customers-over-time}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{figures/num-third-parties-comparison.pdf} 
+	\caption{Relative percentage, based on the state as of December 2018, of the number of publishers of popular and less popular trackers and CNAME-based trackers.}
+	\label{fig:comparison-over-time}
+\end{figure}
+
+To further explore the evolution of the adoption of CNAME-based tracking, we compare it to the evolution of third-party tracking on the web. 
+More specifically, for the ten most popular tracking companies according to WhoTracks.me~\cite{karaj2018whotracks}, and fifteen randomly selected less popular trackers with between 50 and 15,000 publishers as of October 2020 (similar to the customer base we observed for the CNAME-based trackers), we determined the number of publishers in the Tranco top 10k list\footnote{\url{https://tranco-list.eu/list/Z7GG/10000}}, between December 2018 and October 2020.
+To this end we used the EasyPrivacy block list, and only used the rules that match the selected trackers.
+For the three cases (popular trackers, less popular trackers and CNAME-based trackers) we computed the relative increase or decrease in number of publishers for the Tranco top 10k websites.
+As the point of reference, we take the first entry of our dataset: December 2018.
+The relative changes in the number of publishers are shown in Figure~\ref{fig:comparison-over-time}, and indicate that the customer base of less popular trackers declines whereas popular trackers retain a stable customer base.
+This is in line with the findings of a study by Cliqz and Ghostery~\cite{whotracksmegdpr}.
+Our results clearly show that compared to third-party trackers, the CNAME-based trackers are rapidly gaining in popularity, with a growth of 21\% over the past 22 months (compared to a change of $-3\%$ for popular trackers and $-8\%$ for less popular trackers).
+
+
+
+\subsection{Method evaluation}
+\label{sec:method_validation}
+In this section, we evaluate the method we used to detect CNAME-based tracking throughout time for correctness and completeness.
+For this analysis, we make use of historical DNS data provided by Rapid7  \cite{rapid7fdns}. 
+We try to determine both the web pages that were incorrectly considered to be using CNAME-based tracking, as well as publishers that we might have missed by using our method.
+
+\textbf{Correctness}
+To assess the correctness of our approach, we looked for subdomains that we considered to be using CNAME tracking for each month of our analysis (December 2018 until October 2020), but that did not have a CNAME record pointing to a tracker in the corresponding month in the historical Rapid7 DNS dataset.
+We found 81 publishers, 0.46\% of the 17,633 publishers that we determined over the whole period, that could potentially be labeled incorrectly.
+Upon a closer examination, we find that all of these 81 publishers were in fact correctly marked as such.\\
+These 81 publishers can be divided in three major groups based on the same reason that caused the mismatch in the datasets.
+\textit{First}: Because of the timing difference between the HTTP Archive dataset and the Rapid7 dataset, the tracking domain of 21 publishers did not yet appear in the Rapid7 DNS dataset in the first month of starting to use CNAME-based tracking.
+\textit{Second}: We found that 15 CNAME-based tracking domains incorrectly configured their DNS records, causing them to send tracking requests to an non-existent or typo domain.
+For instance, several CNAME records pointed to a \texttt{.207.net} domain instead a \texttt{.2o7.net} domain.
+\textit{Third}: We found 42 publisher tracking subdomains that did not have a CNAME record pointing to a known tracking domain. Instead, it pointed to another domain that would still resolve to the same IP address used by the tracker.
+This occurs when the tracker adds a new tracking domain but the publisher that included it did not yet update their CNAME records.
+For example, we observe nine publisher subdomains that have a CNAME record pointing to \texttt{.ca-eulerian.net}, whereas the currently used domain is \texttt{.eulerian.net}.
+On the other hand, as of October 2020, Adobe Experience Cloud added a new tracking domain, namely \texttt{data.adobedc.net}; in the dataset of this month we found 33 tracking subdomains that already started referring to it.
+As our method is agnostic of the domain name used in the CNAME record of the publisher subdomain (the domain name may change over time), it can detect these instances, in contrast to an approach that is purely based on CNAME records.
+Finally, for the remaining three publishers, we found that a DNS misconfiguration on the side of the publisher caused the CNAME record to not correctly appear in the Rapid7 dataset.
+Although tracking requests were sent to the tracking subdomain, these subdomains would not always resolve to the correct IP address, or return different results based on the geographic location of the resolver.\\
+As a result, we conclude that all of the publishers were correctly categorized as using CNAME-based tracking.
+Moreover, our method is robust against changes in tracking domains used by CNAME trackers. 
+
+
+\textbf{Completeness}
+We evaluate the completeness of our method by examining domain names that we did not detect as publishers, but that do have a CNAME record to a tracking domain.
+Our detection method uses an accumulating approach starting from the most recent month's data (October 2020) and detecting CNAME-based tracking for each previous month, based on the current month's data.
+For this reason, we only consider publisher subdomains that we might have missed in the final month of our analysis (December 2018), where the missed domains error would be most notable. 
+Out of the 20,381 domain names that have a CNAME record in the Rapid7 dataset pointing to a tracking domain, 12,060 (59.2\%) were not present in the HTTP Archive dataset.
+From the remaining domain names, 7,866 (38.6\%) were labeled as publishers by us, leaving 455 (2.2\%) domain names that we \emph{potentially} missed as a consequence of using our method.
+After examining the HTTP Archive dataset for these domains, we find that for 195 hostnames the IP address is missing in the dataset.
+For the remaining 260 domains, we find that the majority (196) does not send any tracking-related request to the tracker, which could indicate that the tracking service is not actively being used.
+For 41 domain names, we find that the sent requests do not match our request pattern, and further examination shows that these are in fact using another service, unrelated to tracking, from one of the providers.
+The remaining 22 domain names were missed as publishers in our method since these resolved to an IP address that was not previously used for CNAME-based tracking. \\
+Our results show that relying solely on DNS data to detect CNAME-based tracking leads to an overestimation of the number of publishers.
+Furthermore, our method missed only 0.28\% of CNAME-based tracking publishers due to irregularities in the set of IP addresses used by CNAME-based tracking providers.
+A downside of our method is that it cannot automatically account for changes of the request signature used by CNAME trackers throughout time.
+However, we note that in the analysis spanning 22 months, we did not encounter changes in the request signature for any of the 13 trackers.
+
+\textbf{Tracker domain ownership}
+Lastly, we verify whether the ownership of the IP-addresses used by the thirteen trackers changes throughout time. To achieve this, we examine PTR records of the IP-addresses used for tracking in December 2018 and check whether the owner company of the resulting domains has changed since then, by using Rapid7's reverse DNS dataset \cite{rapid7rdns} and historical WHOIS data \cite{whoxy}. 
+We find that all of the IP addresses point to domains owned by the corresponding tracker. Furthermore, for 7 trackers, the ownership of the tracking domains has not changed since December 2018. 6 trackers had redacted their WHOIS information due to privacy,  out of which 1 was not updated throughout our measurement period. The other 5 have been updated recently and therefore we cannot conclude that their owner has remained the same. We do suspect this is the case however, since all of the domains were owned by the corresponding tracker before the details became redacted. 
+
+
+\subsection{Effects on third-party tracking}
+In order to gather more insight on the reasons as to why websites adopt CNAME-based tracking, we performed an additional experiment.
+We posed the hypothesis that if the number of third-party trackers employed by websites decreases after they started using the CNAME-based tracking services, this would indicate that the CNAME-based tracking is used as a replacement for third-party tracking.
+A possible reason for this could be privacy concerns: without any anti-tracking measures, third-party tracking allows the tracker to build profiles of users by following them on different sites, whereas CNAME-based tracking only tracks users on a specific site (assuming that the tracker acts in good faith).
+Conversely, if the number of third-party trackers remains stable or even increases, this would indicate that CNAME-based tracking is used in conjunction with third-party tracking, e.g.\ to still obtain information on users that employ anti-tracking measures.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{figures/04-num-third-parties-over-time-pets.pdf} 
+	\caption{Number of third-party trackers adopted by publishers in the six months before and after they adopted a CNAME-based tracker.}
+	\label{fig:third-parties-over-time}
+\end{figure}
+
+
+To measure the evolution of the number of third-party trackers on publisher sites that recently adopted CNAME-based tracking, we again use the measurements ranging between December 2018 and October 2020 from the HTTP Archive dataset.
+We consider a publisher website including a CNAME tracker to be a \emph{new} if for six consecutive months it did not refer to this tracker through a CNAME record on a subdomain, and then for the following six months always included a resource from this tracker.
+In total we found 1,129 publishers at in the duration of our analysis started using CNAME tracking.
+For these publishers, we determined the number of third-party trackers based on the EasyPrivacy blocklist for the six months before and after the time the publishers adopted CNAME-based tracking.
+The average number of third-party trackers over this time period is shown in Figure~\ref{fig:third-parties-over-time}.
+We find that the adoption of CNAME-based tracking services does not significantly affect the third-party trackers that are in use, indicating that these CNAME-based trackers are used to complement the information obtained from other trackers.

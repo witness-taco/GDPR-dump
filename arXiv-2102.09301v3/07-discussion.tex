@@ -1,0 +1,58 @@
+\section{Discussion}
+\label{sec:countermeasures-and-circumvention}
+CNAME-based tracking exists for several years now. Our analysis shows that recently it is rapidly gaining in popularity, especially on frequently-visited websites.
+In this section we explore the current countermeasures against this form of tracking, and discuss their effectiveness and potential circumvention techniques that trackers may use in the future.
+
+\textbf{Countermeasures}
+In response to a report that a tracker was using CNAMEs to circumvent privacy blocklists\footnote{\url{https://github.com/uBlockOrigin/uBlock-issues/issues/780}}, uBlock Origin released an update for its Firefox version that thwarts CNAME cloaking~\cite{ublockrelease}.
+The extension blocks requests to CNAME trackers by resolving the domain names using the \texttt{browser.dns.resolve} API to obtain the last CNAME record (if any) before each request is sent.
+Subsequently, the extension checks whether the domain name matches any of the rules in its blocklists, and blocks requests with matching domains while adding the outcome to a local cache.
+Although uBlock Origin has a version for Chromium-based browsers, the same defense cannot be applied because Chromium-based browser extensions do not have access to an API to perform DNS queries.
+%As such, at the time of this writing, it is technically impossible for these extensions to block requests to trackers that leverage CNAME records to avoid detection.
+As we explain in Section~\ref{sec:cname-tracking}, uBlock Origin for Chrome, which does not have a defense for CNAME-based tracking, still manages to block several trackers.
+This is because the requests to the trackers matched an entry of the blocklist with a URL pattern that did not consider the hostname.
+Unfortunately, it is fairly straightforward for the tracker to circumvent such a fixed rule-based measure, e.g.\ by randomizing the path of the tracking script and analytics endpoint, as is evidenced by the various trackers that could only be blocked by the uBlock Origin on Firefox.
+An alternative strategy for browser extensions that do not have access to a DNS API could be to analyze the behavior or artifacts of tracking scripts.
+However, the tracker's code could be dynamic and include many variations, making detection arduous and performance-intensive.
+%As such, blocking CNAME-based trackers is highly challenging for browser extensions that do not have access to sufficient information to reveal the actual party that a request is made to.
+
+Thanks to the increasing attention to CNAME-based tracking,
+Safari and Brave recently followed uBlock Origin's suit, and implemented countermeasures against CNAME-based tracking.
+Safari limited the expiry of cookies from CNAME trackers to seven days, which is the same limit they use for all cookies set by scripts~\cite{safari-cname-defense}.
+Brave, on the other hand, started recursively checking for CNAME records of the network requests against their blocklists~\cite{brave-cname-defense}.
+Mozilla is working on implementing a similar defense in Firefox~\cite{firefox-cname-defense}.
+
+
+
+Other tracking countermeasures include DNS sinkholes that return a false IP address, (e.g.\ 127.0.0.1) when the domain name matches an entry from the blocklist.
+As this type of countermeasure work at the DNS level, it considers all the intermediary resolutions to CNAME records, and effectively blocks the domains that match a blocklist.
+Examples of DNS-based tools that adopted defenses against CNAME cloaking include NextDNS~\cite{nextdns2019cnamearticle}, AdGuard~\cite{adguardcnamedefense}, and Pi-hole~\cite{piholecnamedefense}.
+
+
+\textbf{Circumvention}
+Both anti-tracking solutions, i.e.\ browser extensions and DNS resolvers, rely on blocklists, and can thus only block trackers whose domain names are on the list.
+Updating CNAME records using
+randomized domain names may bypass these blocklists.
+%This provides a first avenue for circumvention for the trackers: by randomizing the domain names that is referred to in CNAME records, it would become infeasible to rely on a domain-based blocklist.
+However, this requires publishers to frequently update their CNAME records, which may be impractical for many websites.
+%would mean that every time the tracker changes domains, all the publishers that include it would need to update their CNAME record, making it largely impractical.
+Another circumvention option is to directly refer to the IP address of the tracker through an A record instead of a CNAME record.
+We found the pool of IP addresses used by CNAME-based trackers to be relatively stable over time, and in fact found that several (35) publishers already use this method.
+At the time of this writing, using IP addresses (and A records) circumvents blocklists, which do not use IP addresses to identify trackers.
+%but this can be easily defended against by adding the IP addresses to the blocklist.
+
+While IP addresses can be added to blocklists, changing IP addresses as soon as they are added to blocklists would be practically infeasible, as it requires all publishers to update their DNS records.
+Nevertheless, a tracker could request their publishers to delegate authority for a specific subdomain/zone to the tracker by setting an NS record that points to the tracker.
+As such, the tracker could dynamically generate A record responses for any domain name within the delegated zone, and thus periodically change them to avoid being added to blocklists.
+For anti-tracking mechanisms to detect this circumvention technique, this would require obtaining the NS records to determine whether they point to a tracker.
+Although it may be feasible to obtain these records, it may introduce a significant overhead for the browser extensions and DNS-based anti-tracking mechanisms.
+
+In general, as long as the anti-tracking mechanism can detect the indirection to the third-party tracker, it is possible to detect and block requests to the tracker, albeit at a certain performance cost.
+Trackers could try to further camouflage their involvement in serving the tracking scripts and collecting the analytics information.
+For instance, they could request the publishers that include tracking scripts to create a reverse proxy for a specific path that points to the tracker, which could be as easy as adding a few lines in the web server configuration, or adjusting the settings of the CDN provider.
+In such a situation, the tracking-related requests would appear, from a user's perspective, to be sent to the visited website, both in terms of domain name as well as IP address.
+Thus, current tracking defenses would not be able to detect or block such requests.
+As the perpetual battle between anti-tracking mechanisms and trackers continues, as evidenced by the increasing popularity of CNAME-based tracking, we believe that further empirical research on novel circumvention techniques is warranted.
+
+\textbf{Limitations}
+As stated in Section~\ref{sec:historical-evolution}, the method we use to detect CNAME-based tracking in historical data cannot account for changes in the request signature used by trackers. In practise, these signatures remained the same during our measurement period. Furthermore, part of the experiments we conducted in Section~\ref{sec:implications-of-cname-tracking} required substantial manual analysis, making it infeasible to perform on a larger set of websites. 

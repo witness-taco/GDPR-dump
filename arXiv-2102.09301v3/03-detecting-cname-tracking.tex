@@ -1,0 +1,61 @@
+\section{Detecting CNAME-based tracking}
+\label{sec:cname-tracking}
+
+In this section we describe the composition of the datasets along with the various steps of our methodology that we used to detect CNAME-based trackers and the publishers that include them.
+
+\subsection{Dataset}
+In order to analyze the CNAME-based tracking scheme at a scale, we leveraged the (freely available) crawling data from HTTP Archive \cite{http_archive}.
+This dataset originates from visiting the home page of all origins from the Chrome User Experience Report (CrUX), which lists websites (including those hosted on subdomains) frequently visited by Chrome users.
+The results reported in this section are based on the desktop crawl performed in October, consisting of 5,506,818 visited web pages from 4,218,763 unique eTLD+1 domains.
+The information contained in this dataset includes all request and response headers of all the requests (507M in total) that were made when visiting the web pages with the latest Chrome browser.
+As the dataset only contains the IP address of the remote host that was connected to at the time of making the request, we extended the dataset with DNS records (in particular CNAME) obtained by running zdns \cite{zdns} on all first-party subdomains.
+
+\subsubsection{Methodology}
+\label{sec:detection-methodology}
+\noindent \textbf{Discovering trackers}
+To detect services that offer CNAME-based tracking, we used a three-pronged approach that leverages features intrinsic to the ecosystem, combining both automated and manual analysis.
+First we filtered all requests from HTTP Archive's dataset and only considered the ones that were same-site but not same-origin, i.e.\ the same eTLD+1 but not the exact same origin as the visited web page.
+Furthermore, we only retained requests to domain names that returned a CNAME record referring (either directly or indirectly after redirection of other CNAME records) to a different eTLD+1 domain in our DNS data.
+We aggregated these requests on the eTLD+1 of the CNAME record, and recorded a variety of information, such as the average number of requests per website, variation of request size, percentage of requests that contain a cookie or set one via the HTTP response header, etc.
+In Appendix~\ref{sec:assisted-detection} we elaborate on these features and discuss how they could be used to assist or automate the detection of CNAME-based tracking.
+Out of the resulting 46,767 domains, we only consider the ones that are part of a CNAME-chain on at least 100 different websites, which leaves us with 120 potential CNAME-based trackers. 
+
+In the second phase, we performed a manual analysis to rule out services that have no strict intention to track users. 
+Many services that are unrelated to tracking, such as CDNs, use a same-site subdomain to serve content, and may also set a cookie on this domain, thus giving them potential tracking \emph{capabilities}.
+For instance, Cloudflare sets a \texttt{\_cfduid} cookie in order to detect malicious visitors, but does not intend to track users with this cookie (user information is kept less than 24 hours)~\cite{cloudflarecookies}.
+For each of the 120 domains, we visited the web page of the related organization (if available) and gathered information about the kind of service(s) it provides according to the information and documentation provided on its website.
+Based on this information, we then determined whether tracking was the main service provided by this company, either because it explicitly indicated this, or tracking would be required for the main advertised product, e.g.\ in order to provide users with personalized content, or whether this was clear from the way the products were marketed.
+For instance one such provider, Pardot offers a service named ``Marketing Automation'', which they define as ``a technology that helps businesses grow by automating marketing processes, tracking customer engagement, and delivering personalized experiences to each customer across marketing, sales, and service''\footnote{\url{https://www.pardot.com/what-is-marketing-automation/}}, indicating that customers (website visitors) may be tracked.
+Finally, we validate this based on the requests sent to the purported tracker when visiting a publisher website: we only consider a company to be a tracker when a uniquely identifying parameter is stored in the browser and sent along with subsequent requests, e.g.\ via a cookie or using localStorage.
+Using this method, we found a total of 5 trackers. 
+Furthermore, we extended the list with eight trackers from the CNAME cloaking blocklist by NextDNS~\cite{nextdnscnamecloakinggithub,nextdnscnamecloaking}. Four of the trackers we detected in our manual analysis were not included in the block list. We left two of the trackers from the list out of consideration, as they were not included in the DNS data.
+In total we consider 13 CNAME-based trackers.
+
+
+\noindent \textbf{Detecting the prevalence of CNAME-based tracking}
+By examining request information to hostnames having a CNAME record to one of the identified trackers, we manually constructed a \emph{signature} for all tracking requests for each of the 13 trackers, based on the DNS records and request/response information (e.g.\ the same JavaScript resource being accessed or a request URL according to a specific pattern).
+This allows us to filter out any instances where a resource was included from a tracking provider but is unrelated to tracking, as the providers may offer various other services and simply relying on DNS data to detect CNAME publisher domains leads to an overestimate (we justify this claim in Section~\ref{sec:method_validation}).
+Using this approach, we detected a total of 10,474 websites (eTLD+1) that used at least one of the trackers; we explore these publishers that use CNAME tracking in more detail in Section~\ref{sec:tracking-customers}.
+
+\subsection{Alternative user agent}
+A limitation of the HTTP Archive dataset, is that all websites were visited with the Chrome User-Agent string, a browser that does not have built-in tracking protection. 
+Furthermore, only the home page of each website was visited.
+To evaluate whether these limitations would affect our results, we performed a crawling experiment on the Tranco top 10,000 websites\footnote{\url{https://tranco-list.eu/list/6WGX/10000}}; for every website, we visited up to 20 web pages (totaling 146,397 page visits). 
+We performed the experiment twice: once with the Chrome User-Agent string, and once with Safari's.
+The latter is known for its strict policies towards tracking, and thus may receive different treatment.
+We used a headless Chrome instrumented through the Chrome DevTools Protocol \cite{chromedevtools} as our crawler. 
+A comparative analysis of these two crawls showed that one tracker, namely Criteo, would only resort to first-party tracking for Safari users.
+Previously, this tracker was found to abuse top-level redirections~\cite{criteofirstparty} and leverage the HTTP Strict Transport Security (HSTS) mechanism to circumvent Safari's ITP~\cite{criteohsts,Apple-HSTS-Abuse}.
+
+
+\subsection{Coverage}
+Finally, to analyze the representativeness of our results and determine whether the composition of the HTTP Archive dataset did not affect our detection, we performed a comparative analysis with our custom crawl.
+In the 8,499 websites that were both in the Tranco top 10k, and the HTTP Archive dataset, we found a total of 465 (5.47\%) websites containing a CNAME-based tracker.
+These included 66 websites that were not detected to contain CNAME-based tracking based on the data from HTTP Archive (as it does not crawl through different pages).
+On the other hand, in the HTTP Archive dataset we found 209 websites that were detected to contain a CNAME-based tracker, which could not be detected as such based on our crawl results.
+This is because the HTTP Archive dataset also contains popular subdomains, which are not included in the Tranco list.
+As such, we believe that the HTTP Archive dataset provides a representative view of the state of CNAME-based tracking on the web.
+We note however that the numbers reported in this paper should be considered lower bounds, as certain instances of tracking can only be detected when crawling through multiple pages on a website.
+
+
+

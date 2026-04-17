@@ -1,0 +1,57 @@
+\section{Assisted detection}
+\label{sec:assisted-detection}
+
+First-party subdomains referring to third-parties are by no means exclusive to CNAME-based tracking: 
+services such as CDNs rely on a similar setup. Many websites hosting various services utilize CNAMEs to connect website domains to third-party hosts. Furthermore, a variety of different kinds of services provide third-party content in a first-party context by using CNAME records. Examples include  Consent Management Providers or domain parking services and traffic management platforms.\\
+
+
+In our approach to distinguish the various kinds of first-party services we collected features that 
+help us characterize a resource. For each of the 120 services we considered, we measured the number of websites the first-party is active on, the number of different hostnames a request to the service originates from, and the number of unique paths occurring in requests to the service. Furthermore, we captured the body size of the response, 
+its content type (i.e. an image, script, video or html resource) and the average number of requests per website using the service. 
+Lastly, we detected the percentage of requests and websites that sent and received cookies from the service.\\
+
+To measure the uniformity of the response sizes of potential first-party trackers we sorted the sizes in buckets, each bucket with a size of 100 bytes. We then considered the number of buckets as a possible feature for distinction between different kinds of services. A low number of buckets would indicate that the service has a similar response to each request (e.g. the same script) which would increase the likelihood of the service being a tracker. 
+
+After manually visiting the websites of each of the considered services, we were able to classify them in three different categories: \textit{trackers}, \textit{Content Distribution Networks} (CDNs) and \textit{other}. Any service that did not mention being explicitly a CDN or a tracker on their website, was categorized as ``other''. 
+
+
+To gain a better understanding of the features we collected, we analyzed their distribution across the different categories. Figure \ref{fig:assisted_detection} shows the features that are the least overlapping for the three categories. \\
+As can be deduced from Figure \ref{fig:num_resp_buckets} and Figure \ref{fig:avg_request_paths_per_page}, the number of response size buckets and the number of unique paths accessed by the website is much lower for trackers than for CDNs and other services. This was in line with our expectation that customer websites access a similar resource each time.  Furthermore, tracking services receive a low number of requests per website and often respond with a cookie. \\
+
+
+Given the fact that we had a small list of confirmed trackers only, it was not feasible to build a classifier with the purpose of distinguishing tracking services from other types of services. However, our findings are still useful for performing assisted detection of tracking services. They form a simple heuristic for ruling out some companies from being trackers. With more data, the features that we gathered could likely be used for automatic detection. 
+
+
+
+\begin{figure}
+	\begin{subfigure}[b]{0.45\linewidth}
+		\includegraphics[width=\linewidth]{figures/avg_request_paths_per_page.pdf}
+		\caption[Network2]
+		{{\small Distribution of the average number of unique paths per website}}    
+		\label{fig:avg_request_paths_per_page}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.45\linewidth}  
+		\includegraphics[width=\linewidth]{figures/avg_request_per_page.pdf}
+		\caption[]
+		{{\small Distribution of the average number of requests per website to the service}}    
+		\label{fig:avg_req_per_page}
+	\end{subfigure}
+	\vskip\baselineskip
+	\begin{subfigure}[b]{0.45\linewidth}   
+		\includegraphics[width=\linewidth]{figures/perc_pages_with_response_cookie.pdf}
+		\caption[]
+		{{\small Distribution of the percentage of responses containing at least one cookie}}    
+		\label{fig:perc_pages_with_response_cookie}
+	\end{subfigure}
+	\qquad
+	\begin{subfigure}[b]{0.45\linewidth}   
+		\includegraphics[width=\linewidth]{figures/num_resp_buckets.pdf}
+		\caption[]
+		{{\small Distribution of different response sizes sorted in buckets of size 100 bytes}}    
+		\label{fig:num_resp_buckets}
+	\end{subfigure}
+	\caption[ The average and standard deviation of critical parameters ]
+	{\small Features distinguishing trackers from other types of services} 
+	\label{fig:assisted_detection}
+\end{figure}

@@ -1,0 +1,93 @@
+\section{CNAME-based tracking}
+\label{sec:cname-tracking}
+In this section, we provide an in-depth overview of the CNAME-based tracking ecosystem through a large-scale analysis.
+
+\subsection{CNAME-based trackers}
+An overview of the detected trackers can be found in Table~\ref{tab:trackers-list}.
+For every tracker we indicated the number of publishers, counted as the number of unique eTLD+1 domains that have at least one subdomain set up to refer to a tracker (typically with a CNAME record).
+Furthermore, we estimated the total number of publishers by levering DNS information from the SecurityTrails API \cite{security_trails}.
+More precisely, all CNAME-based trackers either require the publishers that include them to set a CNAME record to a specific domain, or the trackers create a new subdomain for every publisher.
+As such, the estimated number of publishers could be determined by finding the domains that had a CNAME record pointing to the tracker, or by listing the subdomains of the tracker domain and filtering out those that did not match the pattern that was used for publishers.
+For Ingenious Technologies we were unable to estimate the total number of publishers as they use a wildcard subdomain (and thus it could not be determined whether a subdomain referred to an actual publisher using CNAME tracking).
+
+
+\renewcommand{\arraystretch}{1.1}
+\begin{table*}
+	\caption{Overview of the analyzed CNAME-based trackers, based on the HTTP Archive dataset from October 2020.}
+	\centering
+	\label{tab:trackers-list}
+	\begin{threeparttable}
+		\adjustbox{max width=\textwidth}{
+			\begin{tabular}{ M{3.8cm} r r r c c c } 
+				\hline
+				& & & & \multicolumn{3}{c}{\textbf{requests to tracker is blocked by}} \\
+				\textbf{Tracker} & \multicolumn{1}{M{2.2cm}}{\textbf{Detected \#~publishers}} & \multicolumn{1}{M{2.2cm}}{\textbf{Est.~total \#~publishers}} & \multicolumn{1}{M{1.6cm}}{\textbf{Pricing} (min.~/mo)} & \multicolumn{1}{M{2.3cm}}{\textbf{uBlock Origin Firefox}} & \multicolumn{1}{M{2.3cm}}{\textbf{uBlock Origin Chrome}} & \multicolumn{1}{M{2.9cm}}{\textbf{NextDNS CNAME~blocklist}} \\
+				\hline
+				Pardot & 5,993 & 21,759 & \$1,250\hphantom{\textsuperscript{$\dagger$}} & \hphantom{\textsuperscript{*}}\faCheck\textsuperscript{*} & \hphantom{\textsuperscript{*}}\faCheck\textsuperscript{*} & \faClose \\
+				Adobe Experience Cloud & 2,612 & 9,029 & \$5,000\textsuperscript{$\dagger$} & \faCheck & \faCheck & \faCheck\\ 
+				Act-On Software & 1,041 & 2,533 & \$900\hphantom{\textsuperscript{$\dagger$}} & \faCheck & \faCheck & \faClose \\ 
+				Oracle Eloqua & 304 & 3,743 & \$2,000\textsuperscript{$\dagger$} & \faCheck & \faClose & \faClose \\ 
+				Eulerian & 253 & 1,501 & ?\hphantom{\textsuperscript{$\dagger$}} & \faCheck & \faClose & \faCheck\\
+				Webtrekk & 101 & 822 & ?\hphantom{\textsuperscript{$\dagger$}} & \faCheck & \faCheck & \faCheck \\
+				Ingenious Technologies & 41 & - & ?\hphantom{\textsuperscript{$\dagger$}} & \faClose & \faClose & \faCheck \\ 
+				TraceDock & 49 & 69 & \euro49\hphantom{\textsuperscript{$\dagger$}} & \faClose & \faClose & \faCheck \\ 
+				<intent> & 14 & 124 & ?\hphantom{\textsuperscript{$\dagger$}} & \faClose & \faClose & \faCheck \\
+				AT Internet & 31 & 74 & \euro355\hphantom{\textsuperscript{$\dagger$}} & \faClose & \faClose & \faCheck\\
+				Criteo & 16 & 13,082 & ?\hphantom{\textsuperscript{$\dagger$}} & \faCheck & \faClose & \faCheck \\
+				Keyade & 12 & 86 & ?\hphantom{\textsuperscript{$\dagger$}} & \faCheck & \faClose & \faCheck \\
+				Wizaly & 12 & 55 & \$2000\textsuperscript{$\dagger$} & \faClose & \faClose & \faCheck \\
+				\hline
+		\end{tabular}}
+	\end{threeparttable}
+	\begin{tablenotes}
+		\small
+		\item $\dagger$: Pricing information does not originate from original source, but as reported in reviews of the product. 
+		\item *: Requests made to the CNAME subdomain triggered by a third-party analytics script hosted on \texttt{pardot.com}; the block-\\list prevents the analytics script from loading. If this script was loaded from the CNAME domain, it would not be blocked.
+	\end{tablenotes}
+\end{table*}
+
+We noted the price of the services offered by the tracker suppliers when such information was available, either from the tracker's website or through third-party reviews.
+In most cases, with the exception of TraceDock, which specifically focuses on providing mechanisms for circumvention of anti-tracking techniques, the offered services included a range of analytics and marketing tools.
+
+Finally, for every tracker we determined whether tracking requests would be blocked by three relevant anti-tracking solutions: uBlock Origin (version 1.26) on both Firefox and Chrome, and the NextDNS CNAME blocklist \cite{cname_cloaking_blocklist}, which was used to extend the list of trackers we considered.
+As of version 1.25 of uBlock Origin, the extension on Firefox implements a custom defense against CNAME-based tracking~\cite{ublock-origin-blocks-cname}, by resolving the domain name of requests that are originally not filtered by the standard block list and then again checks this block list against the resolved CNAME records.
+Because Chrome does not support a DNS resolution API for extensions, the defense could not be applied to this browser.
+Consequently, we find that four of the CNAME-based trackers (Oracle Eloqua, Eulerian, Criteo, and Keyade) are blocked by uBlock Origin on Firefox but not on the Chrome version of the anti-tracking extension.
+
+
+\subsection{Tracking publishers}
+
+\label{sec:tracking-customers}
+As a result of our analysis of the HTTP Archive dataset, we detected 10,474 eTLD+1 domains that had a subdomain pointing to at least one CNAME-based tracker, with 85 publishers referring to two different trackers.
+We find that for 9,501 publisher eTLD+1s the tracking request is included from a same-site origin , i.e., the publisher website has the same eTLD+1 as the subdomain it includes tracker content from.
+Furthermore, on 18,451 publisher eTLD+1s we found the tracker was included from a cross-site origin; these were typically sites that were related in some way, e.g.\ belonging to the same organization.
+Although these instances cannot circumvent countermeasures where all third-party cookies are blocked, e.g.\ the built-in protection of Safari, they still defeat blocklists.
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\linewidth]{figures/stacked_tranco.pdf}
+	\caption{Percentage of websites using CNAME-based tracking per bin of 10,000 ranks.}
+	\label{fig:customer-ranking}
+\end{figure}
+
+Figure~\ref{fig:customer-ranking} displays the percentage of publisher eTLD+1s involved in CNAME-based tracking, both in a same-site or cross-site context, for bins of 10,000 Tranco-ranked websites.
+The ratio of same-site to cross-site CNAME-based tracking is consistently between 50\% and 65\% for all bins. 
+We can clearly see that the use of CNAME-based tracking is heavily biased towards more popular websites.
+In the top 10,000 Tranco websites 10\% refer to a tracker via a CNAME record.
+Because our dataset only contains information about the homepage of websites, and does not include results from Criteo, the reported number should be considered a lower bound.
+
+Using the categorization service by McAfee~\cite{mcafeecategory}, we determined the most popular categories among CNAME-based tracking publishers, as shown in Figure~\ref{fig:customer-categories}.
+As a baseline comparison, we also include the distribution of categories in the Tranco top 10k.
+Because of the strong financial motives to perform tracking, e.g.\ marketing and attribution of online purchases, it is not surprising that publishers are mainly financially-focused, with approximately 40\% of the publisher's websites being categorized as Business.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\linewidth]{figures/categories_customer_websites.pdf}
+	\caption{Most popular categories among CNAME-based tracking publishers.}
+	\label{fig:customer-categories}
+\end{figure}
+
+Finally, we explored to what extent publishers that employ CNAME-based tracking also include third-party trackers.
+To this end we analyzed all requests using the EasyPrivacy blocklist \cite{easyprivacy} to determine the number of trackers that would be blocked by this list.
+We find that on the vast majority of websites that include a CNAME-based tracker (93.97\%) at least one third-party tracker was present; on average these sites had 28.43 third-party tracking requests.
+This clearly shows that CNAME-based tracking is most often used in conjunction with other types of tracking.
+From a privacy perspective this may cause certain issues, as the other trackers may also set first-party cookies via JavaScript; we explore this in more detail in Section~\ref{sec:implications-of-cname-tracking}.
