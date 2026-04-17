@@ -1,0 +1,40 @@
+\section{Introduction}
+Websites use trackers for various purposes including analytics, advertising and marketing.
+Although tracking may help websites in monetization of their content, 
+the use of such methods may often come at the expense of users' privacy, for example when it involves building detailed behavioral profiles of users.
+As a reaction to the omnipresence of online tracking, in the previous decade many countermeasures have been developed, including specialised  browser extensions, DNS resolvers, and built-in browser protections.
+As of today, all major browsers (except Google Chrome) include some forms of anti-tracking measures. Safari's Intelligent Tracking Prevention (ITP) includes multiple features to thwart various forms of tracking and circumvention techniques~\cite{safarithirdpartycookieblock}; Firefox' Enhanced Tracking Protection (ETP) and the tracking prevention mechanism in Edge rely on block lists to exclude trackers~\cite{firefoxetp,edgetrackingprevention}.
+
+As a counter-reaction to the increased use of anti-tracking measures, several trackers have resorted to new techniques in an attempt to circumvent these measures.
+Prominent and well-studied examples of these evasion techniques include browser fingerprinting~\cite{eckersley2010unique,Acar:2014:WNF:2660267.2660347,nikiforakis2013cookieless,englehardt2016online,iqbal2020fingerprinting}, leveraging various browser mechanisms to persist a unique identifier~\cite{criteohsts, Apple-HSTS-Abuse,ayenson2011flash}, and creating a fingerprint from hardware anomalies~\cite{mavroudis2017privacy,dey2014accelprint,zhang2019sensorid}.
+A notable example for the use of evasion techniques is the case of Criteo, one of the tracking actors we study in this paper. In 2015, Criteo leveraged a redirection technique to set first-party cookies~\cite{criteofirstparty,benguerah2017setting}, and later abused the HTTP Strict-Transport-Security mechanism~\cite{criteohsts, Apple-HSTS-Abuse}, both in an effort to circumvent Safari's Intelligent Tracking Protection (ITP). Our study complements these past reports with an observation that Criteo is applying a specialised form of first-party tracking to Safari browsers.
+
+In this paper, we report on an evasion technique that has been known for several years but recently gained more traction, presumably due to the increased protection against third-party tracking.
+This tracking scheme takes advantage of a CNAME record on a subdomain such that it is same-site to the including website.
+As such, defenses that block third-party cookies are rendered ineffective.
+Furthermore, because custom subdomains are used, these are unlikely to be included in block lists (instead of blocking the tracker for all sites, block lists would have to include every instance for each website including the CNAME-based tracker).
+
+Using the HTTP Archive dataset, supplemented with results from custom crawls, we report on a large-scale evaluation of the CNAME-based tracking ecosystem, involving 13 manually-vetted tracking companies.
+We find that this type of tracking is predominantly present on popular websites: 9.98\% of the top 10,000 websites employ at least one CNAME-based tracker.
+
+The use of such tracking is rising. Through a historical analysis of the ecosystem, we show that the number of websites that rely on this type of tracking is steadily growing, especially compared to similarly-sized tracking companies which have experienced a decline in number of publishers.
+We find that CNAME-based tracking is often used in conjunction with other trackers: on average 28.43 third-party tracking scripts can be found on websites that also use CNAME-based tracking.
+We note that this complexity in the tracking ecosystem results in unexpected privacy leaks, as it actually introduces new privacy threats inherent to the ecosystem where various trackers often set first-party cookies via the \texttt{document.cookie} interface. We find that due to how the web architecture works, such practices lead to wide-spread cookie leaks. Using automated methods we measure such cookie leaks to CNAME-based trackers and identify cookie leaks on 95\% of the sites embedding CNAME-based trackers.
+Although most of these leaks are due to first-party cookies set by other third-party scripts, we also find cases of cookie leaks to CNAME-based trackers in POST bodies and in URL parameters, which indicates a more active involvement by the CNAME-based trackers.
+
+Furthermore, through a series of experiments, we report on the increased threat surface that is caused by including the tracker as same-site.
+Specifically, we find several instances where requests are sent to the tracking domain over an insecure connection (HTTP) while the page was loaded over a secure channel (HTTPS).
+This allows an attacker to alter the response and inject new cookies, or even alter the HTML code effectively launching a cross-site scripting attack against the website that includes the tracker; the same attacks would have negligible consequences if the tracking iframe was included from a cross-site domain.
+Finally, we detected two vulnerabilities in the tracking functionality of CNAME-based trackers.
+This could expose the data of visitors on \emph{all} publisher websites through cross-site scripting and session-fixation attacks.
+
+\medskip
+\noindent In summary, we make the following contributions:
+\begin{itemize}
+	\item We provide a general overview of the CNAME-based tracking scheme, based on a large-scale analysis involving a custom detection method, allowing us to discover previously unknown trackers.
+	\item We perform a historical analysis to study the ecosystem, and find that this form of first-party tracking is becoming increasingly popular and is often used to complement third-party tracking.
+	\item Through a series of experiments, we analyze the security and privacy implications that are intrinsic to the tracking scheme. We identify numerous issues, including the extensive leakage of cookies set by third-party trackers.
+	\item Based on the observation of practical deployments of the CNAME-based tracking scheme, we report on the worrying security and privacy practices that have negative consequences for web users.
+	\item We discuss the various countermeasures that have recently been developed to thwart this type of tracking, and assess to what extent these are resistant to further circumvention techniques.
+\end{itemize}
+
