@@ -1,0 +1,44 @@
+# pip install feedparser
+import feedparser
+import os
+import time
+
+QUEUE_DIR = r"AUDITOR_PATH"
+HISTORY_FILE = "noyb_seen_urls.txt"
+
+def check_noyb_rss():
+    print("Checking NOYB RSS Feed for new cases...")
+    feed = feedparser.parse("https://noyb.eu/en/rss.xml")
+    
+    # Load previously seen URLs
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "r") as f:
+            seen_urls = set(f.read().splitlines())
+    else:
+        seen_urls = set()
+
+    new_targets = []
+    
+    for entry in feed.entries:
+        url = entry.link
+        # If it's a new URL and it's an actual case page
+        if url not in seen_urls and "/project/" in url:
+            new_targets.append(url)
+            seen_urls.add(url)
+            print(f"-> [NEW TARGET SPOTTED]: {url}")
+
+    # If we found new targets, queue them for the Orchestrator
+    if new_targets:
+        queue_file = os.path.join(QUEUE_DIR, f"noyb_trigger_{int(time.time())}.txt")
+        with open(queue_file, "w") as f:
+            f.write("\n".join(new_targets))
+            
+        # Update our history
+        with open(HISTORY_FILE, "w") as f:
+            f.write("\n".join(seen_urls))
+        print(f"Queued {len(new_targets)} URLs for PyDoll Orchestrator.")
+    else:
+        print("No new updates. Going back to sleep.")
+
+if __name__ == "__main__":
+    check_noyb_rss()
